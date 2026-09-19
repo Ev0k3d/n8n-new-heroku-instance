@@ -30,7 +30,9 @@ COPY --from=runner /etc/n8n-task-runners.json /etc/n8n-task-runners.json
 
 COPY start.sh /start.sh
 USER root
-RUN chmod +x /start.sh
+RUN chmod +x /start.sh && \
+    mkdir -p /home/runner && \
+    chown node:node /home/runner
 USER node
 
 ENTRYPOINT ["/start.sh"]
