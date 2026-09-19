@@ -14,19 +14,17 @@ RUN cd /opt/runners/task-runner-python && \
 
 # ---- Stage 2: n8n itself, with the whole runner filesystem grafted in ----
 FROM n8nio/n8n:${N8N_VERSION}
-USER root
 
-# Copy the ENTIRE runner image filesystem into its own folder, rather than
-# merging individual files into n8n's paths. This is deliberately the
-# "safe but heavier" choice: it can't silently overwrite anything n8n's own
-# image already relies on (its own Node.js, its own libraries). The runner
-# process then runs chrooted into this folder, so from its point of view it
-# has its own complete, untouched filesystem.
+# COPY doesn't need USER root - the builder does it with full privileges
+# regardless of the active USER. So we don't touch USER here, and the image
+# keeps running as n8n's own intended user throughout (Heroku dynos also
+# don't allow chroot even as root, so isolating the runner that way is not
+# an option here - we just point it at its own copied files instead).
 COPY --from=runner / /opt/python-runner-fs
 
 COPY start.sh /start.sh
+USER root
 RUN chmod +x /start.sh
+USER node
 
-# Root is required here so start.sh can chroot the runner process. n8n itself
-# is still what ends up serving traffic; start.sh does not change that.
 ENTRYPOINT ["/start.sh"]
