@@ -1,19 +1,26 @@
 #!/bin/sh
 # Runs two things in this one container:
 #   1. n8n itself (unchanged from the original image's own startup)
-#   2. the Python task runner launcher, chrooted into its own copied
-#      filesystem, talking to n8n over localhost only (no external
-#      networking needed - both processes share this one dyno)
+#   2. the Python task runner launcher, run from its own copied files,
+#      talking to n8n over localhost only (no external networking needed -
+#      both processes share this one dyno)
 set -eu
 
 echo "[start.sh] starting n8n..."
 /docker-entrypoint.sh n8n start &
 N8N_PID=$!
 
-echo "[start.sh] starting Python task runner (chrooted)..."
+echo "[start.sh] starting Python task runner..."
+# Heroku dynos don't allow chroot (no CAP_SYS_CHROOT), even as root, so we
+# can't isolate this the way a normal Docker host would allow. Instead we
+# just run the copied launcher/python directly by path, and point the
+# dynamic linker and Python's own module search at the copied files with
+# env vars, so it uses its own copy rather than anything of n8n's.
 (
   export N8N_RUNNERS_TASK_BROKER_URI="http://127.0.0.1:5679"
-  chroot /opt/python-runner-fs /usr/local/bin/task-runner-launcher python
+  export LD_LIBRARY_PATH="/opt/python-runner-fs/usr/local/lib:${LD_LIBRARY_PATH:-}"
+  export PATH="/opt/python-runner-fs/usr/local/bin:$PATH"
+  /opt/python-runner-fs/usr/local/bin/task-runner-launcher python
 ) &
 RUNNER_PID=$!
 
