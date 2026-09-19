@@ -22,6 +22,12 @@ FROM n8nio/n8n:${N8N_VERSION}
 # an option here - we just point it at its own copied files instead).
 COPY --from=runner / /opt/python-runner-fs
 
+# n8n's own image ships a task-runner config with no "python" entry (it only
+# expects JavaScript). Overwrite it with the runner image's own config,
+# which does define python, so the launcher can actually find that runner
+# type at its default config path.
+COPY --from=runner /etc/n8n-task-runners.json /etc/n8n-task-runners.json
+
 COPY start.sh /start.sh
 USER root
 RUN chmod +x /start.sh
