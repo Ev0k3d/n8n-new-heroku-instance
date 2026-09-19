@@ -1,0 +1,3 @@
+# Pip packages available to Python Code nodes in n8n.
+# Add one per line, then rebuild and redeploy the image.
+requests
