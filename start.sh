@@ -7,7 +7,10 @@
 set -eu
 
 echo "[start.sh] starting n8n..."
-/docker-entrypoint.sh n8n start &
+# Just "start" - the entrypoint script itself already runs "exec n8n $@",
+# so passing "n8n start" here would run "n8n n8n start", which n8n's CLI
+# reads as an unknown subcommand called "n8n".
+/docker-entrypoint.sh start &
 N8N_PID=$!
 
 echo "[start.sh] starting Python task runner..."
