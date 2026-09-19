@@ -4,7 +4,7 @@
 #   2. the Python task runner launcher, run from its own copied files,
 #      talking to n8n over localhost only (no external networking needed -
 #      both processes share this one dyno)
-set -eu
+set -u
 
 echo "[start.sh] starting n8n..."
 # Just "start" - the entrypoint script itself already runs "exec n8n $@",
@@ -24,15 +24,18 @@ echo "[start.sh] starting Python task runner..."
   export LD_LIBRARY_PATH="/opt/python-runner-fs/usr/local/lib:${LD_LIBRARY_PATH:-}"
   export PATH="/opt/python-runner-fs/usr/local/bin:$PATH"
   /opt/python-runner-fs/usr/local/bin/task-runner-launcher python
+  echo "[start.sh] WARNING: python task runner exited - Python Code nodes will not work until this is fixed" >&2
 ) &
 RUNNER_PID=$!
 
-# If either process dies, bring the whole container down so Heroku restarts
-# it, rather than limping along with only half the system working.
-# (plain POSIX sh has no "wait -n", so poll instead)
-while kill -0 "$N8N_PID" 2>/dev/null && kill -0 "$RUNNER_PID" 2>/dev/null; do
-  sleep 5
-done
-echo "[start.sh] a process exited, shutting down"
-kill "$N8N_PID" "$RUNNER_PID" 2>/dev/null || true
-wait 2>/dev/null || true
+# n8n is the process that actually matters for the dyno to be considered
+# "up". If IT exits, the container should exit too so Heroku restarts it.
+# The runner dying on its own must NOT take n8n down with it - that's what
+# caused the last crash (runner died first, this script killed n8n mid
+# database migration). n8n just can't run Python code until the runner is
+# fixed; everything else keeps working.
+wait "$N8N_PID"
+EXIT_CODE=$?
+echo "[start.sh] n8n exited with code $EXIT_CODE, shutting down"
+kill "$RUNNER_PID" 2>/dev/null || true
+exit "$EXIT_CODE"
